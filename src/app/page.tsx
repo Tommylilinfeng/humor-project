@@ -2,16 +2,26 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { signInWithGoogle, signOut } from './auth/actions'
 import VoteButtons from './components/VoteButtons'
 
+interface CaptionImage {
+  id: string
+  url: string | null
+  image_description: string | null
+}
+
+interface CaptionRow {
+  id: string
+  content: string
+  created_datetime_utc: string
+  image_id: string
+  images: CaptionImage | CaptionImage[] | null
+}
+
 interface Caption {
   id: string
   content: string
   created_datetime_utc: string
   image_id: string
-  images: {
-    id: string
-    url: string | null
-    image_description: string | null
-  }
+  image: CaptionImage | null
 }
 
 interface CaptionVote {
@@ -47,7 +57,22 @@ async function getCaptions() {
     return []
   }
 
-  return (data || []) as Caption[]
+  // Normalize: Supabase may return images as object or array
+  return (data || []).map((row: CaptionRow) => {
+    let image: CaptionImage | null = null
+    if (Array.isArray(row.images)) {
+      image = row.images[0] || null
+    } else if (row.images) {
+      image = row.images
+    }
+    return {
+      id: row.id,
+      content: row.content,
+      created_datetime_utc: row.created_datetime_utc,
+      image_id: row.image_id,
+      image,
+    }
+  }) as Caption[]
 }
 
 async function getUserVotes(userId: string) {
@@ -177,11 +202,11 @@ export default async function Home() {
                   className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {/* Image */}
-                  {caption.images?.url && (
+                  {caption.image?.url && (
                     <div className="w-full bg-gray-100">
                       <img
-                        src={caption.images.url}
-                        alt={caption.images.image_description || 'Caption image'}
+                        src={caption.image.url}
+                        alt={caption.image.image_description || 'Caption image'}
                         className="w-full h-64 object-contain"
                       />
                     </div>
