@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { signInWithGoogle, signOut } from './auth/actions'
 import VoteButtons from './components/VoteButtons'
+import ImageUpload from './components/ImageUpload'
 
 interface CaptionImage {
   id: string
@@ -183,6 +184,9 @@ export default async function Home() {
             </button>
           </form>
         </div>
+
+        {/* Image Upload Section */}
+        <ImageUpload />
 
         {/* Captions list */}
         {captions.length === 0 ? (
