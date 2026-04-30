@@ -7,6 +7,8 @@ import {
 import CaptionDeck from './components/CaptionDeck'
 import ImageUpload from './components/ImageUpload'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -58,13 +60,18 @@ export default async function Home() {
           </form>
         </div>
 
-        <ImageUpload />
-
         <CaptionDeck initialCaptions={initialCaptions} />
 
-        <p className="mt-6 text-center text-xs text-gray-400">
-          Rate one caption at a time. Skipped captions you&rsquo;ve already voted on are filtered out automatically.
+        <p className="mt-6 mb-8 text-center text-xs text-gray-400">
+          Rate one caption at a time. Captions you&rsquo;ve already voted on are filtered out automatically.
         </p>
+
+        <details className="group">
+          <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 bg-white rounded-xl shadow-sm border border-gray-100 group-open:rounded-b-none group-open:border-b-0">
+            ＋ Upload your own image &amp; generate captions
+          </summary>
+          <ImageUpload />
+        </details>
       </div>
     </div>
   )

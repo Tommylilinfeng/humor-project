@@ -129,9 +129,16 @@ function shuffle<T>(arr: T[]): T[] {
   return copy
 }
 
+interface BaseCaption {
+  id: string
+  content: string
+  image_id: string
+  image: DeckImage | null
+}
+
 // Round-robin interleave so the same image rarely appears back-to-back.
-function interleaveByImage(captions: DeckCaption[]): DeckCaption[] {
-  const groups: Record<string, DeckCaption[]> = {}
+function interleaveByImage<T extends { id: string; image_id: string }>(captions: T[]): T[] {
+  const groups: Record<string, T[]> = {}
   for (const c of captions) {
     const key = c.image_id || c.id
     if (!groups[key]) groups[key] = []
@@ -142,7 +149,7 @@ function interleaveByImage(captions: DeckCaption[]): DeckCaption[] {
   }
 
   const keys = shuffle(Object.keys(groups))
-  const result: DeckCaption[] = []
+  const result: T[] = []
   let lastKey: string | null = null
   while (keys.some(k => groups[k].length > 0)) {
     let chosen: string | undefined = keys.find(k => groups[k].length > 0 && k !== lastKey)
@@ -160,72 +167,65 @@ export async function fetchNextCaptions(limit = 60): Promise<DeckCaption[]> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  // Captions this user has already voted on
-  const { data: voted } = await supabase
-    .from('caption_votes')
-    .select('caption_id')
-    .eq('profile_id', user.id)
-
-  const votedIds = (voted ?? []).map(v => v.caption_id as string)
-
-  let query = supabase
-    .from('captions')
-    .select(`
-      id,
-      content,
-      image_id,
-      images (
+  const [votedRes, capRes] = await Promise.all([
+    supabase
+      .from('caption_votes')
+      .select('caption_id')
+      .eq('profile_id', user.id),
+    supabase
+      .from('captions')
+      .select(`
         id,
-        url,
-        image_description
-      )
-    `)
-    .eq('is_public', true)
-    .limit(limit * 2)
+        content,
+        image_id,
+        images (
+          id,
+          url,
+          image_description
+        )
+      `)
+      .eq('is_public', true),
+  ])
 
-  if (votedIds.length > 0) {
-    query = query.not('id', 'in', `(${votedIds.join(',')})`)
-  }
-
-  const { data, error } = await query
-  if (error) {
-    console.error('Error fetching captions:', error)
+  if (capRes.error) {
+    console.error('Error fetching captions:', capRes.error)
     return []
   }
 
-  const rows = (data ?? []) as CaptionRowRaw[]
-  if (rows.length === 0) return []
+  const votedIds = new Set((votedRes.data ?? []).map(v => v.caption_id as string))
+  const allRows = (capRes.data ?? []) as CaptionRowRaw[]
 
-  // Get aggregate vote counts for these captions
-  const ids = rows.map(r => r.id)
+  const unvoted: BaseCaption[] = allRows
+    .filter(r => !votedIds.has(r.id))
+    .map(row => {
+      let image: DeckImage | null = null
+      if (Array.isArray(row.images)) image = row.images[0] ?? null
+      else if (row.images) image = row.images
+      return { id: row.id, content: row.content, image_id: row.image_id, image }
+    })
+
+  if (unvoted.length === 0) return []
+
+  const sliced = interleaveByImage(shuffle(unvoted)).slice(0, limit)
+  const slicedIds = sliced.map(c => c.id)
+
   const { data: voteRows } = await supabase
     .from('caption_votes')
     .select('caption_id, vote_value')
-    .in('caption_id', ids)
+    .in('caption_id', slicedIds)
 
-  const counts = new Map<string, { up: number; down: number }>()
-  for (const id of ids) counts.set(id, { up: 0, down: 0 })
+  const counts: Record<string, { up: number; down: number }> = {}
+  for (const id of slicedIds) counts[id] = { up: 0, down: 0 }
   for (const v of voteRows ?? []) {
-    const c = counts.get(v.caption_id as string)
+    const c = counts[v.caption_id as string]
     if (!c) continue
     if ((v.vote_value as number) > 0) c.up++
     else if ((v.vote_value as number) < 0) c.down++
   }
 
-  const normalized: DeckCaption[] = rows.map(row => {
-    let image: DeckImage | null = null
-    if (Array.isArray(row.images)) image = row.images[0] ?? null
-    else if (row.images) image = row.images
-    const c = counts.get(row.id)!
-    return {
-      id: row.id,
-      content: row.content,
-      image_id: row.image_id,
-      image,
-      upvotes: c.up,
-      downvotes: c.down,
-    }
-  })
-
-  return interleaveByImage(normalized).slice(0, limit)
+  return sliced.map(c => ({
+    ...c,
+    upvotes: counts[c.id]?.up ?? 0,
+    downvotes: counts[c.id]?.down ?? 0,
+  }))
 }
