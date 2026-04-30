@@ -1,136 +1,22 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { signInWithGoogle, signOut } from './auth/actions'
-import VoteButtons from './components/VoteButtons'
+import {
+  signInWithGoogle,
+  signOut,
+  fetchNextCaptions,
+} from './auth/actions'
+import CaptionDeck from './components/CaptionDeck'
 import ImageUpload from './components/ImageUpload'
-
-interface CaptionImage {
-  id: string
-  url: string | null
-  image_description: string | null
-}
-
-interface CaptionRow {
-  id: string
-  content: string
-  created_datetime_utc: string
-  image_id: string
-  images: CaptionImage | CaptionImage[] | null
-}
-
-interface Caption {
-  id: string
-  content: string
-  created_datetime_utc: string
-  image_id: string
-  image: CaptionImage | null
-}
-
-interface CaptionVote {
-  caption_id: string
-  vote_value: number
-}
-
-interface VoteCounts {
-  [captionId: string]: { upvotes: number; downvotes: number }
-}
-
-async function getCaptions() {
-  const supabase = createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('captions')
-    .select(`
-      id,
-      content,
-      created_datetime_utc,
-      image_id,
-      images (
-        id,
-        url,
-        image_description
-      )
-    `)
-    .eq('is_public', true)
-    .order('created_datetime_utc', { ascending: false })
-    .limit(20)
-
-  if (error) {
-    console.error('Error fetching captions:', error)
-    return []
-  }
-
-  // Normalize: Supabase may return images as object or array
-  return (data || []).map((row: CaptionRow) => {
-    let image: CaptionImage | null = null
-    if (Array.isArray(row.images)) {
-      image = row.images[0] || null
-    } else if (row.images) {
-      image = row.images
-    }
-    return {
-      id: row.id,
-      content: row.content,
-      created_datetime_utc: row.created_datetime_utc,
-      image_id: row.image_id,
-      image,
-    }
-  }) as Caption[]
-}
-
-async function getUserVotes(userId: string) {
-  const supabase = createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('caption_votes')
-    .select('caption_id, vote_value')
-    .eq('profile_id', userId)
-
-  if (error) {
-    console.error('Error fetching user votes:', error)
-    return []
-  }
-
-  return (data || []) as CaptionVote[]
-}
-
-async function getVoteCounts(captionIds: string[]): Promise<VoteCounts> {
-  if (captionIds.length === 0) return {}
-
-  const supabase = createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('caption_votes')
-    .select('caption_id, vote_value')
-    .in('caption_id', captionIds)
-
-  if (error) {
-    console.error('Error fetching vote counts:', error)
-    return {}
-  }
-
-  const counts: VoteCounts = {}
-  for (const id of captionIds) {
-    counts[id] = { upvotes: 0, downvotes: 0 }
-  }
-
-  for (const vote of data || []) {
-    if (counts[vote.caption_id]) {
-      if (vote.vote_value > 0) counts[vote.caption_id].upvotes++
-      else if (vote.vote_value < 0) counts[vote.caption_id].downvotes++
-    }
-  }
-
-  return counts
-}
 
 export default async function Home() {
   const supabase = createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Not logged in — show login page
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">😂 Caption Rater</h1>
-          <p className="text-gray-500 mb-8">Sign in to view and rate captions</p>
+          <p className="text-gray-500 mb-8">Sign in to rate captions one at a time</p>
           <form action={signInWithGoogle}>
             <button
               type="submit"
@@ -150,24 +36,11 @@ export default async function Home() {
     )
   }
 
-  // Logged in — fetch captions, votes, and vote counts
-  const captions = await getCaptions()
-  const captionIds = captions.map(c => c.id)
-  const [userVotes, voteCounts] = await Promise.all([
-    getUserVotes(user.id),
-    getVoteCounts(captionIds),
-  ])
-
-  // Build a map of user's votes: caption_id -> vote_value
-  const userVoteMap: { [captionId: string]: number } = {}
-  for (const vote of userVotes) {
-    userVoteMap[vote.caption_id] = vote.vote_value
-  }
+  const initialCaptions = await fetchNextCaptions(60)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
+      <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">😂 Caption Rater</h1>
@@ -185,64 +58,13 @@ export default async function Home() {
           </form>
         </div>
 
-        {/* Image Upload Section */}
         <ImageUpload />
 
-        {/* Captions list */}
-        {captions.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow">
-            <p className="text-gray-500 text-lg">No captions found</p>
-            <p className="text-sm text-gray-400 mt-2">Check back later for new captions to rate!</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {captions.map((caption) => {
-              const counts = voteCounts[caption.id] || { upvotes: 0, downvotes: 0 }
-              const userVote = userVoteMap[caption.id] ?? null
+        <CaptionDeck initialCaptions={initialCaptions} />
 
-              return (
-                <div
-                  key={caption.id}
-                  className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  {/* Image */}
-                  {caption.image?.url && (
-                    <div className="w-full bg-gray-100">
-                      <img
-                        src={caption.image.url}
-                        alt={caption.image.image_description || 'Caption image'}
-                        className="w-full h-64 object-contain"
-                      />
-                    </div>
-                  )}
-
-                  {/* Caption content and voting */}
-                  <div className="p-5">
-                    <p className="text-gray-800 text-lg mb-4 leading-relaxed">
-                      &ldquo;{caption.content}&rdquo;
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <VoteButtons
-                        captionId={caption.id}
-                        userVote={userVote}
-                        upvoteCount={counts.upvotes}
-                        downvoteCount={counts.downvotes}
-                      />
-                      <span className="text-xs text-gray-400">
-                        {new Date(caption.created_datetime_utc).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="mt-8 text-center text-sm text-gray-400">
-          Showing {captions.length} captions
-        </div>
+        <p className="mt-6 text-center text-xs text-gray-400">
+          Rate one caption at a time. Skipped captions you&rsquo;ve already voted on are filtered out automatically.
+        </p>
       </div>
     </div>
   )
