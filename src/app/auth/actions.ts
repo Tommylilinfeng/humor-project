@@ -195,8 +195,22 @@ export async function fetchNextCaptions(limit = 60): Promise<DeckCaption[]> {
   const votedIds = new Set((votedRes.data ?? []).map(v => v.caption_id as string))
   const allRows = (capRes.data ?? []) as CaptionRowRaw[]
 
+  const isCleanCaption = (content: string | null | undefined): content is string => {
+    if (!content) return false
+    const trimmed = content.trim()
+    if (trimmed.length === 0) return false
+    if (trimmed.length > 280) return false
+    const firstChar = trimmed[0]
+    if (firstChar === '[' || firstChar === '{') return false
+    if (trimmed.includes('"created_datetime_utc"')) return false
+    if (trimmed.includes('"profile_id"')) return false
+    if (trimmed.includes('"image_id"') && trimmed.includes('"id"')) return false
+    return true
+  }
+
   const unvoted: BaseCaption[] = allRows
     .filter(r => !votedIds.has(r.id))
+    .filter(r => isCleanCaption(r.content))
     .map(row => {
       let image: DeckImage | null = null
       if (Array.isArray(row.images)) image = row.images[0] ?? null
