@@ -28,7 +28,6 @@ export default function CaptionDeck({ initialCaptions }: Props) {
       setIndex(nextIdx)
       return
     }
-    // Pool drained — try to fetch more
     const more = await fetchNextCaptions(60)
     if (more.length === 0) {
       setExhausted(true)
@@ -75,20 +74,19 @@ export default function CaptionDeck({ initialCaptions }: Props) {
 
   if (exhausted || !current) {
     return (
-      <div className="bg-white rounded-xl shadow-md p-10 text-center">
-        <div className="text-5xl mb-4">🎉</div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          You&rsquo;ve rated everything!
-        </h2>
-        <p className="text-gray-500 mb-6">
+      <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
+        <h3 className="text-xl font-serif text-stone-900 mb-2">
+          You&rsquo;re all caught up
+        </h3>
+        <p className="text-stone-500 mb-6 text-sm">
           {voted > 0
-            ? `Nice work — ${voted} caption${voted === 1 ? '' : 's'} rated this session.`
+            ? `${voted} caption${voted === 1 ? '' : 's'} rated this session.`
             : 'No new captions to rate right now.'}
         </p>
         <button
           onClick={handleRefresh}
           disabled={isPending}
-          className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2.5 bg-stone-900 text-white rounded-lg text-sm font-medium hover:bg-stone-800 disabled:bg-stone-300 transition-colors"
         >
           {isPending ? 'Checking…' : 'Check for new captions'}
         </button>
@@ -99,58 +97,51 @@ export default function CaptionDeck({ initialCaptions }: Props) {
   const remaining = pool.length - index
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
+    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
       {current.image?.url && (
-        <div className="w-full bg-gray-100">
+        <div className="w-full bg-stone-100 border-b border-stone-200">
           <img
             key={current.id}
             src={current.image.url}
             alt={current.image.image_description || 'Caption image'}
-            className="w-full h-72 object-contain"
+            className="w-full h-80 object-contain"
           />
         </div>
       )}
 
-      <div className="p-6">
-        <p className="text-gray-800 text-xl leading-relaxed mb-6 text-center">
+      <div className="px-8 pt-8 pb-6">
+        <p className="text-stone-900 text-2xl font-serif leading-snug text-center max-w-xl mx-auto mb-8">
           &ldquo;{current.content}&rdquo;
         </p>
 
-        <div className="flex items-center justify-center gap-4 mb-4">
+        <div className="flex items-stretch justify-center gap-3">
           <button
             onClick={() => handleVote(1)}
             disabled={isPending}
-            className={`flex-1 max-w-[200px] flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-base font-semibold transition-all ${
+            aria-label="Mark as funny"
+            className={`flex-1 max-w-[220px] flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-medium transition-colors border ${
               isPending && lastVote === 1
-                ? 'bg-green-100 text-green-700 border-2 border-green-400'
-                : 'bg-green-50 text-green-700 border-2 border-green-300 hover:bg-green-100'
-            } ${isPending ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                ? 'bg-stone-900 text-white border-stone-900'
+                : 'bg-white text-stone-900 border-stone-300 hover:border-stone-900 hover:bg-stone-50'
+            } ${isPending ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
           >
-            <span className="text-xl">👍</span>
+            <ThumbsUpIcon />
             <span>Funny</span>
           </button>
 
           <button
             onClick={() => handleVote(-1)}
             disabled={isPending}
-            className={`flex-1 max-w-[200px] flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-base font-semibold transition-all ${
+            aria-label="Mark as not funny"
+            className={`flex-1 max-w-[220px] flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-medium transition-colors border ${
               isPending && lastVote === -1
-                ? 'bg-red-100 text-red-700 border-2 border-red-400'
-                : 'bg-red-50 text-red-700 border-2 border-red-300 hover:bg-red-100'
-            } ${isPending ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                ? 'bg-stone-900 text-white border-stone-900'
+                : 'bg-white text-stone-500 border-stone-300 hover:border-stone-900 hover:text-stone-900 hover:bg-stone-50'
+            } ${isPending ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
           >
-            <span className="text-xl">👎</span>
-            <span>Not Funny</span>
+            <ThumbsDownIcon />
+            <span>Not funny</span>
           </button>
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>
-            👍 {current.upvotes} &nbsp;·&nbsp; 👎 {current.downvotes}
-          </span>
-          <span>
-            {remaining} more in this batch &nbsp;·&nbsp; {voted} rated
-          </span>
         </div>
 
         {errorMsg && (
@@ -159,6 +150,29 @@ export default function CaptionDeck({ initialCaptions }: Props) {
           </div>
         )}
       </div>
+
+      <div className="border-t border-stone-200 bg-stone-50 px-8 py-3 flex items-center justify-between text-xs text-stone-500">
+        <span>{current.upvotes} funny · {current.downvotes} not</span>
+        <span>{remaining} left in batch · {voted} rated</span>
+      </div>
     </div>
+  )
+}
+
+function ThumbsUpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l5-9 1 .5a2 2 0 0 1 1 2.38Z" />
+    </svg>
+  )
+}
+
+function ThumbsDownIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-5 9-1-.5a2 2 0 0 1-1-2.38Z" />
+    </svg>
   )
 }

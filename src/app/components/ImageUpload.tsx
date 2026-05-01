@@ -156,13 +156,10 @@ export default function ImageUpload() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">📸 Upload Image & Generate Captions</h2>
-
-      {/* File input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-600 mb-2">
-          Choose an image (JPEG, PNG, WebP, GIF, HEIC)
+    <div className="bg-white rounded-2xl border border-stone-200 p-8">
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-stone-700 mb-2">
+          Image file
         </label>
         <input
           ref={fileInputRef}
@@ -170,44 +167,42 @@ export default function ImageUpload() {
           accept={SUPPORTED_TYPES.join(',')}
           onChange={handleFileChange}
           disabled={isLoading}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer disabled:opacity-50"
+          className="block w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-stone-300 file:text-sm file:font-medium file:bg-white file:text-stone-700 hover:file:bg-stone-50 file:cursor-pointer disabled:opacity-50"
         />
+        <p className="mt-2 text-xs text-stone-400">JPEG, PNG, WebP, GIF, or HEIC.</p>
       </div>
 
-      {/* Preview */}
       {preview && (
-        <div className="mb-4 bg-gray-50 rounded-lg p-2">
+        <div className="mb-5 bg-stone-50 rounded-lg p-3 border border-stone-200">
           <img
             src={preview}
             alt="Preview"
-            className="max-h-64 mx-auto object-contain rounded"
+            className="max-h-72 mx-auto object-contain"
           />
         </div>
       )}
 
-      {/* Buttons */}
-      <div className="flex gap-3 mb-4">
+      <div className="flex gap-2 mb-4">
         <button
           onClick={handleUploadAndCaption}
           disabled={!file || isLoading}
-          className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2.5 bg-stone-900 text-white rounded-lg text-sm font-medium hover:bg-stone-800 disabled:bg-stone-300 disabled:cursor-not-allowed transition-colors"
         >
-          {isLoading ? 'Processing...' : 'Upload & Generate Captions'}
+          {isLoading ? 'Generating…' : 'Generate captions'}
         </button>
         {file && (
           <button
             onClick={handleReset}
             disabled={isLoading}
-            className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            className="px-4 py-2.5 text-sm text-stone-500 hover:text-stone-900 disabled:opacity-50 transition-colors"
           >
             Reset
           </button>
         )}
       </div>
 
-      {/* Status */}
       {status && isLoading && (
-        <div className="flex items-center gap-2 text-sm text-blue-600 mb-4">
+        <div className="flex items-center gap-2 text-sm text-stone-500 mb-4">
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -216,24 +211,26 @@ export default function ImageUpload() {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* Generated captions */}
       {captions.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Generated Captions</h3>
-          <div className="space-y-2">
+        <div className="mt-6 pt-6 border-t border-stone-200">
+          <h3 className="text-sm font-medium text-stone-500 uppercase tracking-wide mb-4">
+            Generated captions
+          </h3>
+          <div className="space-y-3">
             {captions.map((caption, index) => (
               <div
                 key={caption.id || index}
-                className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4"
+                className="bg-stone-50 border border-stone-200 rounded-lg px-5 py-4"
               >
-                <p className="text-gray-800">&ldquo;{caption.content}&rdquo;</p>
+                <p className="text-stone-900 font-serif text-lg leading-snug">
+                  &ldquo;{caption.content}&rdquo;
+                </p>
               </div>
             ))}
           </div>
