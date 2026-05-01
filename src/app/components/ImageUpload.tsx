@@ -28,19 +28,25 @@ export default function ImageUpload() {
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const isHeic = (f: File) =>
+    f.type === 'image/heic' ||
+    f.type === 'image/heif' ||
+    /\.(heic|heif)$/i.test(f.name)
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
     if (!selected) return
 
-    if (!SUPPORTED_TYPES.includes(selected.type)) {
-      setError(`Unsupported file type: ${selected.type}. Please use JPEG, PNG, WebP, GIF, or HEIC.`)
+    if (!SUPPORTED_TYPES.includes(selected.type) && !isHeic(selected)) {
+      setError(`Unsupported file type: ${selected.type || 'unknown'}. Please use JPEG, PNG, WebP, GIF, or HEIC.`)
       return
     }
 
     setFile(selected)
     setError(null)
     setCaptions([])
-    setPreview(URL.createObjectURL(selected))
+    // HEIC/HEIF can't be rendered as a preview by Chrome/Firefox, so don't try.
+    setPreview(isHeic(selected) ? null : URL.createObjectURL(selected))
   }
 
   const getAccessToken = async (): Promise<string> => {
@@ -164,11 +170,25 @@ export default function ImageUpload() {
         <input
           ref={fileInputRef}
           type="file"
-          accept={SUPPORTED_TYPES.join(',')}
+          accept={SUPPORTED_TYPES.join(',') + ',.heic,.heif'}
           onChange={handleFileChange}
           disabled={isLoading}
-          className="block w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-stone-300 file:text-sm file:font-medium file:bg-white file:text-stone-700 hover:file:bg-stone-50 file:cursor-pointer disabled:opacity-50"
+          className="sr-only"
+          id="image-upload-input"
         />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm font-medium border border-stone-300 rounded-md bg-white text-stone-700 hover:bg-stone-50 disabled:opacity-50 transition-colors"
+          >
+            Choose file
+          </button>
+          <span className="text-sm text-stone-500 truncate">
+            {file ? file.name : 'No file chosen'}
+          </span>
+        </div>
         <p className="mt-2 text-xs text-stone-400">JPEG, PNG, WebP, GIF, or HEIC.</p>
       </div>
 
@@ -179,6 +199,20 @@ export default function ImageUpload() {
             alt="Preview"
             className="max-h-72 mx-auto object-contain"
           />
+        </div>
+      )}
+
+      {file && !preview && isHeic(file) && (
+        <div className="mb-5 bg-stone-50 border border-stone-200 rounded-lg p-4 flex items-center gap-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 flex-shrink-0">
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+            <circle cx="9" cy="9" r="2"/>
+            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+          </svg>
+          <div className="text-sm text-stone-600">
+            <span className="font-medium">{file.name}</span> selected.
+            <span className="text-stone-400"> HEIC preview is not supported in this browser, but the model will process it normally.</span>
+          </div>
         </div>
       )}
 
